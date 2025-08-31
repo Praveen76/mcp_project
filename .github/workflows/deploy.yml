@@ -1,0 +1,68 @@
+name: build-and-deploy
+on:
+  push:
+    branches: [ main ]
+
+concurrency:
+  group: ecs-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # needed only for OIDC; harmless otherwise
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPO:   ${{ vars.ECR_REPO }}
+      ECS_CLUSTER:${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE:${{ vars.ECS_SERVICE }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --- Auth to AWS (pick one) ---
+      - name: Configure AWS (OIDC)
+        if: ${{ secrets.AWS_ROLE_ARN != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure AWS (Access Keys)
+        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push (linux/amd64)
+        run: |
+          REGISTRY=${{ steps.ecr.outputs.registry }}
+          IMAGE=$REGISTRY/${{ env.ECR_REPO }}
+          GIT_TAG=${GITHUB_SHA::12}
+          docker buildx build --platform linux/amd64 \
+            -t $IMAGE:latest \
+            -t $IMAGE:$GIT_TAG \
+            --push .
+
+      - name: Force new deployment
+        run: |
+          aws ecs update-service \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --service "${{ env.ECS_SERVICE }}" \
+            --force-new-deployment \
+            --region "${{ env.AWS_REGION }}"
+
+      - name: Show service events (last 10)
+        run: |
+          aws ecs describe-services --cluster "${{ env.ECS_CLUSTER }}" --services "${{ env.ECS_SERVICE }}" \
+            --query "services[0].events[:10].[createdAt,message]" --output table

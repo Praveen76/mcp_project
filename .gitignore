@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.dll
+*.dylib
+*.egg-info/
+dist/
+build/
+.venv/
+.uv/
+.mypy_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Env & secrets
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.crt
+*.p12
+*.der
+
+# OS / Editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.code-workspace
+
+# Logs & temp
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Data/cache (adjust to your project)
+cache/
+**/cache/**
+*.db
+*.sqlite*
+*.parquet
+*.feather
+*.arrow
+# Uncomment if you keep big local datasets out of git:
+# data/
+# *.csv
+# *.tsv
+
+# Terraform (if you add infra/)
+.terraform/
+terraform.tfstate
+terraform.tfstate.*
+crash.log
+*.tfvars
+*.tfvars.json
+!*.example.tfvars
